@@ -67,35 +67,31 @@ while not readSuccess or not torrents:
     readSuccess = True
 logging.info("Running through torrents to find public torrents.")
 # Filter for public torrents
-publicTorrentsList = []
+foundTorrents = []
 for torrent in torrents:
     try:
-        torrentInfo = qb.torrents_trackers(torrent_hash=torrent['hash'])
+        if 'x265' in torrent['name'].lower() or 'hevc' in torrent['name'].lower():
+            logging.info("Encode found: " + torrent['name'])
+            torrentInfo = qb.torrents_trackers(torrent_hash=torrent['hash'])
+            if torrentInfo[0]['msg'] != 'This torrent is private':
+                logging.info("Public torrent found")
+                if torrent['category'] != 'Movies + TV':
+                    logging.info("Moving to Movies + TV category")
+                    qb.torrents_set_category('Movies + TV', torrent['hash'])
+                foundTorrents.append(torrent['hash'])
     except qbittorrentapi.NotFound404Error:
         logging.error("No torrent found for hash: " + torrent['hash'] + ". Skipping...")
         continue
     except Exception:
         logging.error("Auth error. Skipping to try again...")
         continue
-    try:
-        # if torrentInfo[0]['msg'] != 'This torrent is private' or ('hawke.uno' not in torrentInfo[3]['url'] and 'xtremewrestling' not in torrentInfo[3]['url']):
-        #     publicTorrentsList.append(torrent)
-        #     logging.info("Public torrent found: " + torrent['name'])
-        #     logging.info("Throttling upload for hash: " + torrent['hash'])
-        #     qb.torrents_set_upload_limit(limit=20000, torrent_hashes=torrent['hash'])
-        if torrentInfo[0]['msg'] == 'This torrent is private':
-            # publicTorrentsList.append(torrent)
-            logging.info("Private torrent found: " + torrent['name'])
-            # logging.info("Unthrottling upload for hash: " + torrent['hash'])
-            # qb.torrents_set_upload_limit(limit=-1, torrent_hashes=torrent['hash'])
-        else:
-            logging.info("Public torrent found: " + torrent['name'])
-            logging.info("Throttling upload for hash: " + torrent['hash'])
-            qb.torrents_set_upload_limit(limit=10000, torrent_hashes=torrent['hash'])
-    except Exception:
-        logging.warning("Failed to set upload limit. Skipping...")
-        continue
 
+logging.info(f"Found {len(foundTorrents)} torrents")
+logging.info("Adding To Upload tags")
+qb.torrents_add_tags("To Upload", foundTorrents)
+logging.info("Pausing torrents")
+qb.torrents_pause(foundTorrents)
+logging.info("Torrents paused")
 
 logging.info("All public torrents throttled")
 # logging.info("All public torrents: ")
